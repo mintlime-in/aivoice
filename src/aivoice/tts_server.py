@@ -6,7 +6,7 @@ import os, queue, re, secrets, socket, threading, time
 import sounddevice as sd
 from kokoro_onnx import Kokoro
 
-from . import aec, config
+from . import aec, config, textprep
 
 cfg = config.load()
 MODELS = config.path("models")
@@ -34,19 +34,6 @@ def stop_playback():
         pass
 
 
-def chunks(text, limit=280):
-    out, cur = [], ""
-    for sent in re.split(r"(?<=[.!?:;])\s+", text):
-        if cur and len(cur) + len(sent) + 1 > limit:
-            out.append(cur)
-            cur = sent
-        else:
-            cur = (cur + " " + sent).strip()
-    if cur:
-        out.append(cur)
-    return out
-
-
 def worker():
     while True:
         text, my_gen, voice = latest.get()
@@ -55,7 +42,7 @@ def worker():
         ready = queue.Queue(maxsize=2)
 
         def producer():
-            for c in chunks(text):
+            for c in textprep.chunks(text):
                 if my_gen != gen:
                     break
                 try:

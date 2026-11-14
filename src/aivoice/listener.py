@@ -58,8 +58,14 @@ def _llm_brief(raw):
         tts_client.speak(textprep.speak_text(raw, "brief"))
 
 
+SHORT_REPLY = 400                # characters: a reply this short is read as it is, with no summary step in between
+
+
 def speak_raw(raw, kind):
-    if kind == "brief" and use_llm():
+    full = textprep.speak_text(raw, "full")
+    if kind == "brief" and len(full) <= SHORT_REPLY:
+        tts_client.speak(full)                           # nothing to shorten: say it at once
+    elif kind == "brief" and use_llm():
         threading.Thread(target=_llm_brief, args=(raw,), daemon=True).start()
     else:
         tts_client.speak(textprep.speak_text(raw, kind))
@@ -250,8 +256,11 @@ def main():
             if late is None:
                 text, confident = tr.transcribe(audio, glossary)
                 if not confident:
+                    print(f"  (dropped, probably not speech: {text!r}, {len(audio)/SR:.1f}s)", flush=True)
                     continue                                     # likely a hallucination on noise
                 if textprep.noise(text):
+                    if text.strip():
+                        print(f"  (ignored: {text!r})", flush=True)
                     continue
                 fr = STATE.pop("fragment", None)
                 if fr and time.time() - fr[1] < 12:              # the rest of a sentence you paused in
@@ -286,7 +295,7 @@ def main():
                     continue
                 text = rest                                      # not one of the assistant's own commands: treat it like any sentence
             sink, key, where = route(cfg, default_sink)
-            print(f"> {text}   [{len(audio)/SR:.1f}s audio, {time.time()-t0:.1f}s to transcribe] -> {where}", flush=True)
+            print(f"{time.strftime('%H:%M:%S')} > {text}   [{len(audio)/SR:.1f}s audio, {time.time()-t0:.1f}s to transcribe] -> {where}", flush=True)
             fwd = voice_command(text, sink, key)
             if fwd is None:
                 continue

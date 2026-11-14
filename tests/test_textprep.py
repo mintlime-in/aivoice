@@ -55,3 +55,26 @@ def test_short_reply_is_read_whole():
 def test_links_and_urls():
     out = t.full_text(t.blocks("See [the docs](https://x.com/a) or https://y.com now."))
     assert out == "See the docs or now."
+
+
+def test_a_short_reply_is_spoken_at_once_without_the_summary_model(monkeypatch):
+    from aivoice import listener, tts_client
+    said = []
+    monkeypatch.setattr(tts_client, "speak", lambda text, voice="": said.append(text))
+    monkeypatch.setattr(listener, "use_llm", lambda: True)
+    monkeypatch.setattr(listener, "_llm_brief", lambda raw: said.append("<summary model>"))
+    listener.speak_raw("It's 7:45 PM IST on Saturday, November 14, 2026.", "brief")
+    assert said == ["It's 7:45 PM IST on Saturday, November 14, 2026."]
+    said.clear()
+    listener.speak_raw("A long reply. " * 60, "brief")
+    import time; time.sleep(0.05)
+    assert said == ["<summary model>"]
+
+
+def test_the_first_piece_of_speech_is_short_so_the_voice_starts_sooner():
+    from aivoice.textprep import chunks
+    assert chunks("It's 7:45 PM IST on Saturday, November 14, 2026.") == ["It's 7:45 PM IST on Saturday,", "November 14, 2026."]
+    assert chunks("Done. All 42 tests pass. The build is green.") == ["Done.", "All 42 tests pass. The build is green."]
+    long = "First. " + "A sentence of medium length here. " * 12
+    out = chunks(long)
+    assert out[0] == "First." and all(len(c) <= 280 for c in out) and " ".join(out).split() == long.split()

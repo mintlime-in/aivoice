@@ -172,3 +172,29 @@ def noise(text):
     """True for what should be dropped unheard: Whisper's stock phrases on silence, bare punctuation, thinking noises."""
     t = text.lower().strip(" .!?,\u2026")
     return t in JUNK or bool(re.fullmatch(r"[\W_]*", text)) or bool(FILLER.fullmatch(t))
+
+
+# ---------- pieces for the voice ----------
+def chunks(text, limit=280, first=30):
+    """Pieces to synthesize one after another. The first piece is kept short (a sentence, or the part before a comma)
+    because nothing is heard until it is ready; later pieces are made while the earlier ones play."""
+    parts = re.split(r"(?<=[.!?:;])\s+", text.strip())
+    if parts and len(parts[0]) > first:
+        m = re.search(r",\s+", parts[0][15:])                  # a natural pause early in a long first sentence
+        if m:
+            cut = 15 + m.end()
+            parts[:1] = [parts[0][:cut].rstrip(), parts[0][cut:]]
+    out, cur = [], ""
+    for i, sent in enumerate(parts):
+        if not sent:
+            continue
+        if i == 0:
+            out.append(sent)
+        elif cur and len(cur) + len(sent) + 1 > limit:
+            out.append(cur)
+            cur = sent
+        else:
+            cur = (cur + " " + sent).strip()
+    if cur:
+        out.append(cur)
+    return out

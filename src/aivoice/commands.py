@@ -40,15 +40,15 @@ def sync():
 class Watcher(threading.Thread):
     """Keeps the registry current and speaks finished replies read from the agents' transcripts."""
 
-    def __init__(self, cfg, speak, interval=1.0, announce=None):
+    def __init__(self, cfg, speak, interval=0.25, announce=None):
         super().__init__(daemon=True)
-        self.cfg, self.speak, self.interval, self.tails, self._n = cfg, speak, interval, {}, 0
+        self.cfg, self.speak, self.interval, self.tails, self._synced = cfg, speak, interval, {}, 0.0
         self.announce = announce or (lambda line: None)
 
     def step(self):
-        if self._n % 3 == 0:
+        if time.time() - self._synced > 3:              # looking for new or ended sessions is slower; a transcript is checked every poll
+            self._synced = time.time()
             sync()
-        self._n += 1
         for s in sessions.all():
             if not s.get("transcript"):
                 continue
@@ -72,7 +72,7 @@ class Watcher(threading.Thread):
                 if self.cfg.get("announce", True):
                     self.announce(finished_line(s))
                 return
-        print(f"  (reply from {spoken_name(s)}: {len(text)} characters)", flush=True)
+        print(f"{time.strftime('%H:%M:%S')}   (reply from {spoken_name(s)}: {len(text)} characters)", flush=True)
         self.speak(text)
 
     def run(self):
