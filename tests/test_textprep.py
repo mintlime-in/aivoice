@@ -78,3 +78,43 @@ def test_the_first_piece_of_speech_is_short_so_the_voice_starts_sooner():
     long = "First. " + "A sentence of medium length here. " * 12
     out = chunks(long)
     assert out[0] == "First." and all(len(c) <= 280 for c in out) and " ".join(out).split() == long.split()
+
+
+def test_the_tools_own_spoken_line_is_read_and_kept_out_of_the_full_reading():
+    from aivoice import textprep
+    raw = "I changed `cli.py` and ran the tests.\n\n```bash\npytest -q\n```\n\n🔊 All tests pass, and the help text is shorter now."
+    assert textprep.voice_line(raw)[0] == "All tests pass, and the help text is shorter now."
+    assert textprep.speak_text(raw, "brief") == "All tests pass, and the help text is shorter now."
+    full = textprep.speak_text(raw, "full")
+    assert "cli" in full and "🔊" not in full and "All tests pass" not in full
+    assert textprep.voice_line("**🔊 Done.**")[0] == "Done." and textprep.voice_line("> 🔊️: Ready for review.")[0] == "Ready for review."
+    assert textprep.voice_line("No line here.") == ("", "No line here.")
+
+
+def test_instruction_block_is_added_once_and_removed_cleanly(tmp_path):
+    from aivoice import instructions
+    f = tmp_path / "CLAUDE.md"
+    f.write_text("# my rules\n- be brief\n")
+    assert instructions.add(str(f)) and not instructions.add(str(f))
+    assert f.read_text().count(instructions.START) == 1 and "🔊" in f.read_text() and f.read_text().startswith("# my rules\n- be brief\n")
+    assert instructions.remove(str(f)) and f.read_text() == "# my rules\n- be brief\n" and not instructions.remove(str(f))
+    g = tmp_path / "new" / "AGENTS.md"
+    g.parent.mkdir()
+    assert instructions.add(str(g)) and g.read_text() == instructions.BLOCK
+
+
+def test_setup_asks_before_touching_a_tools_instructions(tmp_path, monkeypatch):
+    from aivoice import cli, instructions
+    f = tmp_path / ".claude" / "CLAUDE.md"
+    f.parent.mkdir()
+    monkeypatch.setattr(instructions, "TOOLS", {"Claude Code": str(f)})
+    monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: True, raising=False)
+    cli._setup_spoken_line(ask=lambda q: "n")
+    assert not f.exists()
+    cli._setup_spoken_line(ask=lambda q: "")
+    assert instructions.present(str(f))
+    cli._setup_spoken_line(ask=lambda q: "no")
+    assert not instructions.present(str(f))
+    monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: False, raising=False)
+    cli._setup_spoken_line(ask=lambda q: "y")
+    assert not instructions.present(str(f))

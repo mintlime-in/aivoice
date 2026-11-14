@@ -104,6 +104,24 @@ def _setup_llm(cfg, llm):
         print(f"  could not fetch it. Start Ollama, then run:  ollama pull {name}")
 
 
+def _setup_spoken_line(ask=input):
+    """Offer, per AI tool found on this machine, to ask it to end each reply with a line meant to be heard."""
+    from . import instructions
+    for tool, path in instructions.installed_tools().items():
+        if instructions.present(path):
+            if sys.stdin.isatty() and ask(f"{tool} ends its replies with a spoken line ({path}). Keep that? [Y/n] ").strip().lower() in ("n", "no"):
+                instructions.remove(path)
+                print("  removed; replies are summarized here instead")
+            continue
+        if not sys.stdin.isatty():
+            print(f"{tool}: run `aivoice setup` in a terminal to have it end replies with a spoken line")
+            continue
+        if ask(f"Ask {tool} to end each reply with a short line meant to be heard? It adds a few lines to {path}, "
+               f"and replies are read faster and better. [Y/n] ").strip().lower() not in ("n", "no"):
+            instructions.add(path)
+            print(f"  added to {path}; run `aivoice setup` again to remove it")
+
+
 def cmd_setup(a):
     from . import llm, stt
     cfg = config.load()
@@ -121,6 +139,7 @@ def cmd_setup(a):
         print("  ->", stt.prefetch(cfg, name)[1])
     if a.llm:
         _setup_llm(cfg, llm)
+    _setup_spoken_line()
     gl = config.path("glossary.txt")
     if not os.path.exists(gl):
         with open(gl, "w") as fh:

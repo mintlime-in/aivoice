@@ -9,6 +9,9 @@ read back to you. The only things it handles itself are voice controls ("stop", 
 
 - **Talk, don't type.** Your speech is typed into the session you are looking at.
 - **Hear the answer your way.** Brief by default. Say *"read it all"* for the whole reply, *"summarize that"* for a summary.
+- **The tool says what to say.** `aivoice setup` offers to ask Claude Code (and Codex, Gemini CLI) to end each reply with a short
+  line starting with 🔊, meant to be heard. aivoice reads that line: no summary step, no local model needed. Without it, short replies
+  are read as they are and long ones are summarized here.
 - **Several sessions.** Only the session in front speaks; the others say "<session> has finished." and keep their reply for later.
 - **Move between sessions by voice.** *"Computer, what's open?"*, *"Computer, switch to the portal session"*.
 - **Nothing is installed into your tools.** It finds Claude Code sessions by itself and reads their replies from Claude's own transcripts.

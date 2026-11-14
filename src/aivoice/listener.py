@@ -63,7 +63,9 @@ SHORT_REPLY = 400                # characters: a reply this short is read as it 
 
 def speak_raw(raw, kind):
     full = textprep.speak_text(raw, "full")
-    if kind == "brief" and len(full) <= SHORT_REPLY:
+    if kind == "brief" and textprep.voice_line(raw)[0]:
+        tts_client.speak(textprep.speak_text(raw, "brief"))      # the tool wrote what to say: no summary step at all
+    elif kind == "brief" and len(full) <= SHORT_REPLY:
         tts_client.speak(full)                           # nothing to shorten: say it at once
     elif kind == "brief" and use_llm():
         threading.Thread(target=_llm_brief, args=(raw,), daemon=True).start()

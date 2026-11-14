@@ -152,9 +152,25 @@ def load_last(key):
         return ""
 
 
+_VOICE_LINE = re.compile(r"^[ \t>*_-]*\U0001F50A\uFE0F?[ \t*_:-]*(.+?)[ \t*_]*$", re.M)
+
+
+def voice_line(raw):
+    """-> (the reply's own spoken line, the reply without it). The line is the one the AI tool was asked to end with
+    (see instructions.py); "" when it is not there."""
+    found = list(_VOICE_LINE.finditer(raw or ""))
+    if not found:
+        return "", raw
+    m = found[-1]
+    return m.group(1).strip(), (raw[:m.start()] + raw[m.end():]).rstrip()
+
+
 def speak_text(raw, mode=None):
-    """What to say for a reply, in the given mode ('full' or 'brief')."""
-    items = blocks(raw)
+    """What to say for a reply, in the given mode ('full' or 'brief'). Brief uses the reply's own spoken line when it has one."""
+    said, rest = voice_line(raw)
+    if (mode or get_mode()) != "full" and said:
+        return endp(inline(said))
+    items = blocks(rest)
     return full_text(items) if (mode or get_mode()) == "full" else brief_text(items)
 
 
