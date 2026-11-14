@@ -91,3 +91,13 @@ def test_talk_mode_never_lets_the_model_turn_a_question_into_a_command(monkeypat
     fake(monkeypatch, '{"action": "brief"}')
     assert intent.interpret("can you summarize about this project", CFG, use_model=False) == ("forward", "can you summarize about this project")
     assert intent.interpret("summarize that", CFG, use_model=False) == ("command", "brief")
+
+
+def test_the_model_cannot_swallow_a_question_or_a_real_sentence(monkeypatch):
+    fake(monkeypatch, '{"action": "stop"}')
+    said = "No, no, no. What's the time now? Last spoken line."               # from a real session: it was eaten as "stop"
+    assert intent.interpret(said, CFG) == ("forward", said)
+    assert intent.interpret("no wait that is not what I meant at all", CFG)[0] == "forward"
+    assert intent.interpret("okay that's plenty", CFG) == ("command", "stop")    # short and not a question: the model may still decide
+    fake(monkeypatch, '{"action": "full"}')
+    assert intent.interpret("did the build pass?", CFG)[0] == "forward"

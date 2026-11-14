@@ -15,6 +15,7 @@ ACTIONS = ("forward", "full", "brief", "stop", "interrupt", "mode_full", "mode_b
 _STANDING = re.compile(r"from now on|always|by default|every time|going forward|each time|from here on")
 _ABOUT_ME = re.compile(r"\b(you|your|yourself|computer|voice|assistant)\b")
 MAX_WORDS_COMMANDS = 12          # `commands` level: only short sentences are even considered
+MAX_WORDS_STOP = 5               # longer than this, the model may not turn a sentence into stop / interrupt
 
 _FILLER = set("it that this me the reply response answer message thing out loud aloud to of in please can you could would "
               "now again one more time a for hey claude just give version all whole full entire complete completely fully everything".split())
@@ -109,6 +110,8 @@ def interpret(text, cfg, use_model=True):
             return "forward", cleaned.strip()
         return "forward", text
     action = d["action"]
+    if action != "help" and ("?" in text or (action in ("stop", "interrupt") and len(text.split()) > MAX_WORDS_STOP)):
+        return "forward", text                          # a question, or a real sentence that merely starts "no, no": it is for the AI
     if action == "help" and not _ABOUT_ME.search(text.lower()):
         return "forward", text                          # a question about the code, not about the voice: the AI should get it
     if action in ("mode_full", "mode_brief") and not _STANDING.search(text.lower()):
