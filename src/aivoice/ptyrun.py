@@ -6,7 +6,7 @@ its new output is read aloud. Needs no hooks, no iTerm and no tmux.
 Full-screen TUIs redraw a lot, so their output is noisy; prefer a tool's own hook when it has one."""
 import os, re, select, shutil, signal, socket, sys, tempfile, time
 
-from . import config, sessions, textprep, tts_client
+from . import sessions, textprep, tts_client
 
 ANSI = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[()][A-Z0-9]|\x1b[=>78]")
 

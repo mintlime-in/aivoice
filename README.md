@@ -26,7 +26,6 @@ read back to you. The only things it handles itself are voice controls ("stop", 
 |---|---|---|---|
 | Claude Code (terminal) | yes | yes, automatically | found by itself; iTerm2 and tmux reach the exact tab, other terminals and editors work through their window |
 | Any terminal AI tool (Codex CLI, Gemini CLI, aider, ollama ...) | yes | yes | start it as `aivoice run -- codex` |
-| Anything that prints its answer | no | yes | `some-tool \| aivoice speak` |
 | Desktop and browser apps (Claude desktop, ChatGPT, Cursor chat ...) | yes, typed into the window in front | only what you copy ("read the clipboard") | `keystroke` sink |
 
 Automatic read-back for Codex, Cursor and the Claude desktop app is not built yet: see the [roadmap](ROADMAP.md).
@@ -120,7 +119,6 @@ reads its reply aloud. When a background session finishes, aivoice says only "<s
 
 | You want | Use |
 |---|---|
-| Read any command's output aloud | `some-agent ... \| aivoice speak` |
 | Any interactive CLI | `aivoice run -- aider` (voice in and out; macOS, Linux, WSL) |
 | A desktop or browser chat window | speech is typed into the focused window (`keystroke` sink); copy a reply and say "read the clipboard" |
 | Talk to a local model directly | `aivoice on --sink llm` (needs the optional LLM) |

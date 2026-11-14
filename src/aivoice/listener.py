@@ -9,7 +9,7 @@ import collections, os, queue, re, threading, time
 import numpy as np
 import sounddevice as sd
 
-from . import aec, config, intent, commands, wake, llm, platform_, sessions, sinks, stt, textprep, tts_client, vad
+from . import aec, config, intent, commands, log, wake, llm, platform_, sessions, sinks, stt, textprep, tts_client, vad
 
 SR = 16000
 BLOCK = vad.BLOCK               # 512 samples = 32 ms (what Silero expects)
@@ -54,7 +54,7 @@ def _llm_brief(raw):
     try:
         tts_client.speak(llm.summarize(raw, CFG))
     except Exception as e:
-        print("  (local model failed, using the simple summary:", e, ")", flush=True)
+        log.line("PROBLEM", f"the local model could not summarize ({e}); reading the simple summary instead")
         tts_client.speak(textprep.speak_text(raw, "brief"))
 
 
@@ -91,15 +91,21 @@ HELP_SPOKEN = ("I read your AI's replies aloud. Say stop to quiet me, interrupt 
 STATE = {}
 
 
+COMMAND_WORDS = {"stop": "silence the voice", "interrupt": "silence the voice and press Escape in the AI",
+                 "full": "read the whole last reply", "brief": "read a summary of the last reply",
+                 "clip_full": "read the clipboard", "clip_brief": "summarize the clipboard", "help": "say what you can say",
+                 "mode_full": "from now on read whole replies", "mode_brief": "from now on read summaries"}
+
+
 def voice_command(text, sink, key):
     """Handle the sentence if it is for us. Returns the text to forward to the AI, or None when it was handled here."""
     kind, val = intent.interpret(text, CFG)
     if kind == "forward":
         if val != text:
-            print(f"  (cleaned up: {val})", flush=True)
+            log.line("NOTE", f"tidied up to {log.q(val)}")
         return val
     c = val
-    print(f"  (command: {c})", flush=True)
+    log.line("COMMAND", f"{log.q(text)} = {COMMAND_WORDS.get(c, c)}; not sent to the AI")
     if c == "stop":
         tts_client.stop()
     elif c == "interrupt":
@@ -141,14 +147,13 @@ def main():
     glossary = load_glossary()
     end_silence, min_thr = float(cfg["end_silence"]), float(cfg["min_threshold"])
 
-    print(f"summaries: {'local model (' + (llm.backend(cfg) or '?') + ')' if use_llm() else 'simple (no local model; optional)'}", flush=True)
-    print(f"loading speech model ({stt.backend_name(cfg)}: {stt.model_name(cfg)}; first run downloads it) ...", flush=True)
+    log.line("START", f"loading speech to text ({stt.model_name(cfg)}, {stt.backend_name(cfg)}); the first start downloads it")
     tr = stt.Transcriber(cfg)
     tts_client.ensure_server()
     if cfg.get("discover", True):
         commands.Watcher(cfg, lambda raw: speak_raw(raw, textprep.get_mode()),
                        announce=lambda line: tts_client.speak(line)).start()
-        print("sessions: found automatically; replies are read from the agents' transcripts", flush=True)
+        log.line("START", "finding AI sessions by itself; their replies are read from their transcripts")
 
     q = queue.Queue()
     def on_audio(indata, frames, tinfo, status):
@@ -163,8 +168,9 @@ def main():
         noise = [float(np.sqrt(np.mean(q.get()[0] ** 2))) for _ in range(66)]       # ~2 s
         floor = float(np.percentile(noise, 30))                     # ignore bursts (keys, a passing voice)
         thr = min(max(min_thr, floor * 5.0), float(cfg["max_threshold"]))
-        wake = f", wake word: {cfg['wake_word']}" if cfg["wake_word"] else ""
-        print(f"listening (threshold {thr:.4f}{wake}). Say 'stop' to silence, 'interrupt' to stop the AI.", flush=True)
+        how = (f"say {cfg['wake_word']!r} first" if cfg["wake_word"] else "start with the tool's name, e.g. \"Claude, ...\""
+               if cfg.get("wake", "tool") == "tool" else "everything you say is sent")
+        log.line("START", f"listening: {how}. Summaries: {'local model' if use_llm() else 'simple rules'}. Say \"stop\" to silence the voice")
 
         recent = collections.deque(maxlen=int(2.0 * SR / BLOCK))      # ~2 s of the latest audio
         seg = vad.Segmenter(start=float(cfg["vad_start"]), end=float(cfg["vad_end"]), end_silence=end_silence,
@@ -172,7 +178,8 @@ def main():
         detector = vad.make(cfg, thr)
         ec = aec.make(cfg)
         timeline = aec.RefTimeline() if ec else None
-        print(f"voice detection: {detector.name}; echo cancellation: {'WebRTC' if ec else 'off (loudness heuristic)'}", flush=True)
+        log.line("START", f"voice detection: {detector.name}; echo cancellation: {'on' if ec else 'off (talking over the voice is less reliable)'}; "
+                          f"background noise level {thr:.3f}")
         deaf_until = 0.0
         paused = config.path(".paused")
         barge_in, ratio = bool(cfg["barge_in"]), float(cfg["barge_ratio"])
@@ -228,7 +235,7 @@ def main():
                                 echo_win.append((now, smooth))
                     if hot >= 8:                                 # ~0.25 s: you are talking over the voice
                         tts_client.stop()
-                        print(f"  (barge-in: level {smooth:.3f} vs echo {echo:.3f})", flush=True)
+                        log.line("STOPPED", "you talked over the voice, so it stopped and is listening")
                         hot, deaf_until = 0, 0.0
                         seg.start_from(list(recent)[-45:])           # keep ~1.4 s from before we noticed: your first words
                     else:
@@ -252,38 +259,39 @@ def main():
             if late is None:
                 text, confident = tr.transcribe(audio, glossary)
                 if not confident:
-                    print(f"  (dropped, probably not speech: {text!r}, {len(audio)/SR:.1f}s)", flush=True)
+                    log.line("IGNORED", f"{log.q(text)} ({len(audio)/SR:.1f} s): probably noise, not speech")
                     continue                                     # likely a hallucination on noise
                 if textprep.noise(text):
                     if text.strip():
-                        print(f"  (ignored: {text!r})", flush=True)
+                        log.line("IGNORED", f"{log.q(text)}: a filler or what speech to text writes on silence")
                     continue
                 fr = STATE.pop("fragment", None)
                 if fr and time.time() - fr[1] < 12:              # the rest of a sentence you paused in
                     text = fr[0] + " " + text
                 if commands.dangling(text):
                     STATE["fragment"] = (re.sub(r"[.\u2026\s]+$", "", text), time.time())
-                    print(f"> {text}   (waiting for the rest)", flush=True)
+                    log.line("HEARD", f"{log.q(text)}  (sounds unfinished; waiting for the rest)")
                     continue
             else:
                 text = late
+            log.line("HEARD", f"{log.q(text)}  ({len(audio)/SR:.1f} s of speech, text in {time.time()-t0:.1f} s)" if len(audio) else log.q(text))
             if wake_rx:
                 m = wake_rx.match(text)
                 if m:
                     text = text[m.end():].strip()
                     awake_until = time.time() + wake_window
                     if not text:
-                        print("  (awake)", flush=True)
+                        log.line("NOTE", "wake word heard; listening")
                         continue
                 elif time.time() > awake_until:
-                    print(f"  (ignored, start with '{cfg['wake_word']}'): {text}", flush=True)
+                    log.line("NOT SENT", f"{log.q(text)}: start with {cfg['wake_word']!r} to send it")
                     continue                                     # not for me: ignore room chatter
                 else:
                     awake_until = time.time() + wake_window
 
             rest = commands.addressed(text, cfg)
             if rest is not None:
-                print(f"> {text}   [to {cfg['name']}]", flush=True)
+                log.line("COMMAND", f"for aivoice itself: {log.q(rest)}")
                 if not rest:
                     tts_client.speak("Yes?")
                     continue
@@ -296,21 +304,21 @@ def main():
                 if tool:
                     verdict, val = tool_gate.check(text, tool, key, time.time())
                     if verdict == "ignore":
-                        print(f"{time.strftime('%H:%M:%S')}   (not sent; start with '{tool}, ...': {text})", flush=True)
+                        log.line("NOT SENT", f"{log.q(text)}: start with \"{tool}, ...\" to send it to {where}")
                         continue
                     if verdict == "other":
-                        print(f"{time.strftime('%H:%M:%S')}   (you said {val}, but {where} is {tool}; not sent)", flush=True)
+                        log.line("NOT SENT", f"{log.q(text)}: you named {val}, but the session in front is {tool} ({where})")
                         tts_client.speak(f"That's {tool} in front, not {val}.")
                         continue
                     text = val
                     if not text:
-                        print(f"{time.strftime('%H:%M:%S')}   (listening for {tool})", flush=True)
+                        log.line("NOTE", f"{tool} heard; say what to send")
                         continue
-            print(f"{time.strftime('%H:%M:%S')} > {text}   [{len(audio)/SR:.1f}s audio, {time.time()-t0:.1f}s to transcribe] -> {where}", flush=True)
             fwd = voice_command(text, sink, key)
             if fwd is None:
                 continue
             sink.send(fwd)
+            log.line("SENT", f"to {where}: {log.q(fwd)}")
             if sessions.get(key):
                 commands.spoke_to(key)                           # its answer is read even if you look away while it works
             while not q.empty():

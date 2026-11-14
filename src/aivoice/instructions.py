@@ -49,3 +49,52 @@ def remove(path):
     with open(path, "w", encoding="utf-8") as fh:
         fh.write(new.rstrip("\n") + "\n" if new.strip() else "")
     return True
+
+
+# ---------- /aivoice in Claude Code: turn voice on or off without leaving the session ----------
+SKILL_PATH = "~/.claude/skills/aivoice/SKILL.md"
+SKILL = """---
+name: aivoice
+description: Turn aivoice (hands-free voice for your AI sessions) on or off, or show its status.
+argument-hint: "[on | off | status]"
+disable-model-invocation: true
+allowed-tools: Bash(aivoice on) Bash(aivoice off) Bash(aivoice status)
+---
+Run exactly one command for the argument below, then show its output and nothing else. Edit no files.
+
+- `on`: run `aivoice on`
+- `off`: run `aivoice off`
+- `status`: run `aivoice status`
+- no argument: run `aivoice status`; if its first line is `listener: running`, run `aivoice off`, otherwise run `aivoice on`
+- anything else: run nothing and reply: /aivoice on, /aivoice off, /aivoice status, or /aivoice alone to switch it
+
+Argument: $ARGUMENTS
+"""
+
+
+def skill_file():
+    return os.path.expanduser(SKILL_PATH)
+
+
+def has_skill():
+    try:
+        with open(skill_file(), encoding="utf-8") as fh:
+            return fh.read().startswith("---\nname: aivoice\n")
+    except OSError:
+        return False
+
+
+def add_skill():
+    os.makedirs(os.path.dirname(skill_file()), exist_ok=True)
+    with open(skill_file(), "w", encoding="utf-8") as fh:
+        fh.write(SKILL)
+
+
+def remove_skill():
+    """Remove the file only if it is ours."""
+    if has_skill():
+        os.unlink(skill_file())
+        try:
+            os.rmdir(os.path.dirname(skill_file()))
+        except OSError:
+            pass

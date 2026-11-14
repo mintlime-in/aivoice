@@ -10,7 +10,7 @@ lives in its own repository.
 - Loose wording through an optional local model (MLX, llama.cpp, Ollama, any OpenAI-compatible server), checked by plain code.
 - Approval gate with an audit log. The model proposes; only you approve.
 - Announcements when a background session finishes; start at login (`aivoice login on`).
-- Any terminal tool through `aivoice run`, any output through `aivoice speak`.
+- Any terminal tool through `aivoice run`.
 
 **Next**
 1. Read-back connectors: Codex CLI sessions, the Claude desktop app, Cursor, Gemini CLI, Copilot CLI.

@@ -20,7 +20,8 @@ def make(cfg):
     try:
         return EchoCanceller(int(cfg.get("aec_delay_ms", 150)))
     except Exception as e:                    # package not installed, or it failed to initialise
-        print(f"  (echo cancellation unavailable, using the loudness heuristic: {e})", flush=True)
+        from . import log
+        log.line("NOTE", f"echo cancellation is not available ({e}); talking over the voice is less reliable")
         return None
 
 

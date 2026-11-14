@@ -114,3 +114,21 @@ def test_setup_asks_before_touching_a_tools_instructions(tmp_path, monkeypatch):
     monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: False, raising=False)
     cli._setup_spoken_line(ask=lambda q: "y")
     assert not instructions.present(str(f))
+
+
+def test_setup_offers_the_aivoice_command_and_only_removes_its_own_file(tmp_path, monkeypatch):
+    from aivoice import cli, instructions
+    (tmp_path / ".claude").mkdir()
+    monkeypatch.setenv("HOME", str(tmp_path)); monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: True, raising=False)
+    cli._setup_command(ask=lambda q: "n")
+    assert not instructions.has_skill()
+    cli._setup_command(ask=lambda q: "")
+    text = open(instructions.skill_file(), encoding="utf-8").read()
+    assert "disable-model-invocation: true" in text and "$ARGUMENTS" in text and "aivoice off" in text
+    cli._setup_command(ask=lambda q: "no")
+    assert not (tmp_path / ".claude" / "skills" / "aivoice").exists()
+    other = tmp_path / ".claude" / "skills" / "aivoice" / "SKILL.md"
+    other.parent.mkdir(parents=True); other.write_text("---\nname: something-else\n---\nmine\n")
+    instructions.remove_skill()
+    assert other.exists()                                                              # not ours: left alone

@@ -14,7 +14,7 @@ through the approval gate first. Session names come from the list of real sessio
 equally good matches or none means the assistant asks instead of acting."""
 import json, os, re, subprocess, threading, time
 
-from . import agents, config, gate, platform_, sessions, sinks, textprep, tts_client
+from . import agents, config, gate, log, platform_, sessions, sinks, textprep, tts_client
 
 
 _UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
@@ -69,11 +69,14 @@ class Watcher(threading.Thread):
         if self.cfg.get("focus_follows", True) and not asked:
             cur = sessions.current()
             if cur and cur["id"] != s["id"]:
-                print(f"  ({spoken_name(s)} finished; you are looking elsewhere, reply saved)", flush=True)
+                log.line("REPLY", f"from {s.get('name') or spoken_name(s)}, but you are looking at another session: "
+                                  f"{'said that it finished' if self.cfg.get('announce', True) else 'kept quiet'}; say \"read it all\" there to hear it")
                 if self.cfg.get("announce", True):
                     self.announce(finished_line(s))
                 return
-        print(f"{time.strftime('%H:%M:%S')}   (reply from {spoken_name(s)}: {len(text)} characters)", flush=True)
+        said = textprep.voice_line(text)[0]
+        log.line("REPLY", f"from {s.get('name') or spoken_name(s)}, {len(text)} characters"
+                          + (f"{' (the answer to what you asked)' if asked else ''}: reading " + (f"its spoken line {log.q(said)}" if said else "it aloud")))
         self.speak(text)
 
     def run(self):
@@ -81,7 +84,7 @@ class Watcher(threading.Thread):
             try:
                 self.step()
             except Exception as e:
-                print("  (watcher:", e, ")", flush=True)
+                log.line("PROBLEM", f"while checking sessions: {e}")
             time.sleep(self.interval)
 
 
@@ -355,7 +358,7 @@ def handle(rest, cfg, speak=None, say_reply=None, approve=gate.approve, backgrou
             return False
         action, s, text = mp
         who = ""
-        print(f"  (understood as: {action}{' ' + spoken_name(s) if s else ''}{': ' + text if text else ''})", flush=True)
+        log.line("COMMAND", f"understood as: {action}{' ' + spoken_name(s) if s else ''}{': ' + log.q(text) if text else ''}")
     if action == "list":
         if not ss:
             speak("No sessions are open.")

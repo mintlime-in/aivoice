@@ -10,7 +10,7 @@
 """
 import os, socket, subprocess, sys, threading
 
-from . import config, platform_
+from . import log, config, platform_
 
 
 class Sink:
@@ -31,10 +31,10 @@ class Iterm(Sink):
     def _write(self, clause):
         sid = self.target().split(":")[-1]
         if not platform_.IS_MAC:
-            print("  (the iterm sink only works on macOS; use tmux, keystroke or pty)", flush=True)
+            log.line("PROBLEM", "the iTerm sink only works on macOS; use tmux, keystroke or pty")
             return
         if not sid:
-            print("  (no iTerm tab known for this session)", flush=True)
+            log.line("PROBLEM", "not sent: no iTerm tab is known for this session")
             return
         r = platform_.osascript(f'''
 tell application "iTerm2"
@@ -51,7 +51,7 @@ tell application "iTerm2"
   return "missing"
 end tell''')
         if not r or (r.stdout or "").strip() != "ok":
-            print("  (could not find the iTerm tab:", (r.stdout or r.stderr or "").strip() if r else "osascript failed", ")", flush=True)
+            log.line("PROBLEM", "not sent: could not find the iTerm tab (" + ((r.stdout or r.stderr or "").strip() if r else "osascript failed") + ")")
 
     def send(self, text):
         esc = text.replace("\\", "\\\\").replace('"', '\\"')
@@ -95,7 +95,7 @@ class Pty(Sink):
             s.connect(self.target())
             s.sendall(payload)
         except OSError as e:
-            print("  (the wrapped program is gone:", e, ")", flush=True)
+            log.line("PROBLEM", f"not sent: the program started with `aivoice run` has ended ({e})")
         finally:
             s.close()
 
@@ -110,7 +110,7 @@ class Exec(Sink):
     def send(self, text):
         cmd = self.cfg.get("exec_cmd")
         if not cmd:
-            print("  (sink=exec needs exec_cmd in config.toml)", flush=True)
+            log.line("PROBLEM", "sink exec needs exec_cmd in config.toml")
             return
         r = subprocess.run(cmd, shell=True, input=text, capture_output=True, text=True)
         reply = (r.stdout or "").strip()
@@ -142,7 +142,7 @@ class Llm(Sink):
             try:
                 reply = llm.generate(msgs, self.cfg)
             except Exception as e:
-                print("  (local model error:", e, ")", flush=True)
+                log.line("PROBLEM", f"the local model failed: {e}")
                 self.history.pop()
                 return
             self.history.append({"role": "assistant", "content": reply})
@@ -155,7 +155,7 @@ class Null(Sink):
     """A session the assistant can read (its replies) but cannot type into: it is not in a terminal we know how to reach."""
 
     def send(self, text):
-        print("  (cannot type into this session: it is not in iTerm or tmux. Use `aivoice run -- <cmd>` or the keystroke sink.)", flush=True)
+        log.line("PROBLEM", "not sent: this session is not in iTerm or tmux, so it cannot be typed into. Use `aivoice run -- <cmd>` or the keystroke sink")
 
 
 class Stdout(Sink):

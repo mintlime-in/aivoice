@@ -1,5 +1,5 @@
 """aivoice command line."""
-import argparse, json, os, subprocess, sys, time, urllib.request
+import argparse, os, subprocess, sys, urllib.request
 
 from . import config, platform_, sessions, textprep, tts_client
 
@@ -26,8 +26,10 @@ def _spawn_listener():
         return False
     config.ensure()
     log = open(config.path("listener.log"), "ab")
+    env = dict(os.environ, HF_HUB_DISABLE_PROGRESS_BARS="1",               # keep download progress bars and a harmless
+               PYTHONWARNINGS="ignore:resource_tracker:UserWarning")      # shutdown warning out of the readable log
     p = subprocess.Popen([sys.executable, "-m", "aivoice.listener"], stdout=log, stderr=log,
-                         stdin=subprocess.DEVNULL, env=os.environ.copy(), **platform_.detach_kwargs())
+                         stdin=subprocess.DEVNULL, env=env, **platform_.detach_kwargs())
     config.write_state("listener.pid", str(p.pid))
     return True
 
@@ -122,6 +124,27 @@ def _setup_spoken_line(ask=input):
             print(f"  added to {path}; run `aivoice setup` again to remove it")
 
 
+def _setup_command(ask=input):
+    """Offer /aivoice in Claude Code, to turn voice on or off from inside a session."""
+    from . import instructions
+    if not os.path.isdir(os.path.expanduser("~/.claude")):
+        return
+    path = instructions.skill_file()
+    if instructions.has_skill():
+        if sys.stdin.isatty() and ask(f"Claude Code has /aivoice ({path}). Keep it? [Y/n] ").strip().lower() in ("n", "no"):
+            instructions.remove_skill()
+            print("  removed /aivoice")
+        else:
+            instructions.add_skill()                   # refresh it to this version
+        return
+    if not sys.stdin.isatty():
+        print("Claude Code: run `aivoice setup` in a terminal to add /aivoice (turn voice on or off from a session)")
+        return
+    if ask(f"Add /aivoice to Claude Code, to turn voice on or off from any session? It writes {path}. [Y/n] ").strip().lower() not in ("n", "no"):
+        instructions.add_skill()
+        print("  added: type /aivoice in a new Claude Code session")
+
+
 def cmd_setup(a):
     from . import llm, stt
     cfg = config.load()
@@ -140,6 +163,7 @@ def cmd_setup(a):
     if a.llm:
         _setup_llm(cfg, llm)
     _setup_spoken_line()
+    _setup_command()
     gl = config.path("glossary.txt")
     if not os.path.exists(gl):
         with open(gl, "w") as fh:
@@ -221,24 +245,7 @@ def cmd_status(a):
         state = ("working" if s.get("busy") else "idle") if "busy" in s else ""
         print(f"  {s['id'][:8]}  {(s.get('name') or '')[:28]:28} {s['sink']:9} {state:8} {where}")
     if not ss:
-        print("  none yet: a Claude Code session joins when it starts or when you send a prompt in it.")
-
-
-# ---------- speaking ----------
-def _muted():
-    return os.path.exists(config.path(".mute"))
-
-
-def cmd_speak(a):
-    if _muted() or (a.session and not sessions.get(a.session)):
-        return
-    raw = sys.stdin.read()
-    if not raw.strip():
-        return
-    key = a.key or a.session or config.read_state("target") or "default"
-    for k in {key, key.split(":")[-1], "default"}:
-        textprep.save_last(k, raw)
-    tts_client.speak(textprep.speak_text(raw, a.mode))
+        print("  none found: start Claude Code in a terminal, or a tool with `aivoice run -- <tool>`")
 
 
 def cmd_run(a):
@@ -288,23 +295,16 @@ def cmd_doctor(a):
     sys.exit(0 if ok else 1)
 
 
-HELP_TOP = """aivoice: talk to your AI coding agents hands-free and hear their answers. Speech recognition and the voice run on this machine.
+HELP_TOP = """aivoice: talk to your AI tools hands-free and hear their answers. Speech to text and the voice run on this machine.
 
-get started:
-  setup       one-time download of the speech models (about 2 GB)
+  setup       one-time download of the models (about 2 GB)
   doctor      check the microphone, speakers and models
-  on / off    turn voice on, or stop everything and keep it off
+  on / off    start listening, or stop everything
   status      what is running, which models, which sessions
-  login on    start by itself when you log in (login off undoes it)
+  login on    start when you log in (login off undoes it)
+  run         voice for any other terminal tool: aivoice run -- aider
 
-use with any tool:
-  run         add voice to any interactive CLI:    aivoice run -- aider
-  speak       read text aloud:                     some-agent | aivoice speak
-              (--mode full reads everything, default is a short version)
-
-while talking, say:
-  "stop" silences the voice          "interrupt" also stops the AI's turn
-  "read it all"  the whole reply     "summarize that"  a short version
+Say "Claude, ..." to send something; "stop" and "read it all" work any time.
 """
 HELP_END = """'aivoice <command> -h' shows the options of one command.
 files: ~/.aivoice/config.toml, listener.log, tts.log      docs: https://github.com/mintlime-in/aivoice"""
@@ -341,9 +341,6 @@ def main():
     s.set_defaults(f=cmd_login)
     sp.add_parser("doctor", help="check the installation").set_defaults(f=cmd_doctor)
 
-    s = sp.add_parser("speak", help="read stdin aloud (brief or full per mode)")
-    s.add_argument("--mode", choices=["brief", "full"]); s.add_argument("--key"); s.add_argument("--session")
-    s.set_defaults(f=cmd_speak)
     s = sp.add_parser("run", help="run ANY interactive CLI with voice in and out")
     s.add_argument("--no-speak", action="store_true"); s.add_argument("--idle", type=float, default=1.5)
     s.add_argument("command", nargs=argparse.REMAINDER); s.set_defaults(f=cmd_run)
