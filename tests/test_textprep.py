@@ -57,19 +57,15 @@ def test_links_and_urls():
     assert out == "See the docs or now."
 
 
-def test_a_short_reply_is_spoken_at_once_without_the_summary_model(monkeypatch):
-    from aivoice import listener, tts_client
-    said = []
-    monkeypatch.setattr(tts_client, "speak", lambda text, voice="": said.append(text))
-    monkeypatch.setattr(listener, "use_llm", lambda: True)
-    monkeypatch.setattr(listener, "_llm_brief", lambda raw: said.append("<summary model>"))
-    listener.speak_raw("It's 7:45 PM IST on Saturday, November 14, 2026.", "brief")
-    assert said == ["It's 7:45 PM IST on Saturday, November 14, 2026."]
-    said.clear()
-    listener.speak_raw("A long reply. " * 60, "brief")
-    import time; time.sleep(0.05)
-    assert said == ["<summary model>"]
-
+def test_how_a_reply_is_read():
+    from aivoice import textprep
+    short = "It's 7:45 PM IST on Saturday, November 14, 2026."
+    assert textprep.reading(short, "brief", True) == ("say", short)                     # short: no summary step
+    long = "A long reply. " * 60
+    assert textprep.reading(long, "brief", True) == ("summarize", long)
+    assert textprep.reading(long, "brief", False)[0] == "say"
+    assert textprep.reading(long + "\n\n🔊 Done, nothing failed.", "brief", True) == ("say", "Done, nothing failed.")
+    assert textprep.reading(long, "full", True)[0] == "say"
 
 def test_the_first_piece_of_speech_is_short_so_the_voice_starts_sooner():
     from aivoice.textprep import chunks
@@ -96,11 +92,11 @@ def test_instruction_block_is_added_once_and_removed_cleanly(tmp_path):
     f = tmp_path / "CLAUDE.md"
     f.write_text("# my rules\n- be brief\n")
     assert instructions.add(str(f)) and not instructions.add(str(f))
-    assert f.read_text().count(instructions.START) == 1 and "🔊" in f.read_text() and f.read_text().startswith("# my rules\n- be brief\n")
-    assert instructions.remove(str(f)) and f.read_text() == "# my rules\n- be brief\n" and not instructions.remove(str(f))
+    assert f.read_text(encoding="utf-8").count(instructions.START) == 1 and "🔊" in f.read_text(encoding="utf-8") and f.read_text(encoding="utf-8").startswith("# my rules\n- be brief\n")
+    assert instructions.remove(str(f)) and f.read_text(encoding="utf-8") == "# my rules\n- be brief\n" and not instructions.remove(str(f))
     g = tmp_path / "new" / "AGENTS.md"
     g.parent.mkdir()
-    assert instructions.add(str(g)) and g.read_text() == instructions.BLOCK
+    assert instructions.add(str(g)) and g.read_text(encoding="utf-8") == instructions.BLOCK
 
 
 def test_setup_asks_before_touching_a_tools_instructions(tmp_path, monkeypatch):

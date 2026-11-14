@@ -1,5 +1,5 @@
 """Local text prep: what to say out loud. Stdlib only. No LLM, no network, no tokens."""
-import os, re, json
+import os, re
 
 from . import config
 
@@ -214,3 +214,19 @@ def chunks(text, limit=280, first=30):
     if cur:
         out.append(cur)
     return out
+
+
+SHORT_REPLY = 400                # characters: a reply this short is read as it is, with no summary step in between
+
+
+def reading(raw, kind, can_summarize):
+    """How to read a reply: ("say", text) or ("summarize", raw) when the local model should shorten it first.
+    The tool's own spoken line wins; a short reply is read as it is; only a long one without the line is summarized."""
+    if kind != "brief":
+        return "say", speak_text(raw, kind)
+    if voice_line(raw)[0]:
+        return "say", speak_text(raw, "brief")
+    full = speak_text(raw, "full")
+    if len(full) <= SHORT_REPLY:
+        return "say", full
+    return ("summarize", raw) if can_summarize else ("say", speak_text(raw, "brief"))
