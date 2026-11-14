@@ -233,3 +233,26 @@ def test_dangling(said, yes):
     assert commands.dangling(said) is yes
 
 
+
+
+def test_the_answer_to_what_you_said_is_read_even_if_you_looked_away(home, monkeypatch):
+    from aivoice import sessions
+    tr = home / "t.jsonl"
+    tr.write_text("")
+    reg(home, transcript=str(tr))
+    reg(home, id="s2", name="other")
+    monkeypatch.setattr(commands, "sync", lambda: [])
+    monkeypatch.setattr(sessions, "current", lambda: sessions.get("s2"))          # you switched to another tab while it worked
+    spoken, told = [], []
+    w = commands.Watcher(CFG, spoken.append, announce=told.append)
+    w.step()
+
+    def reply(text):
+        with open(tr, "a") as fh:
+            fh.write(json.dumps({"type": "assistant", "message": {"stop_reason": "end_turn", "content": [{"type": "text", "text": text}]}}) + "\n")
+        w.step()
+    commands.spoke_to("s1")
+    reply("It is eight o'clock.")
+    assert spoken == ["It is eight o'clock."] and told == []
+    reply("A later reply you did not ask for by voice.")                           # only the first answer: later ones follow focus again
+    assert spoken == ["It is eight o'clock."] and len(told) == 1

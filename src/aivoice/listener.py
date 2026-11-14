@@ -295,6 +295,8 @@ def main():
             if fwd is None:
                 continue
             sink.send(fwd)
+            if sessions.get(key):
+                commands.spoke_to(key)                           # its answer is read even if you look away while it works
             while not q.empty():
                 q.get()
 

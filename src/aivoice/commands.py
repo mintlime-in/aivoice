@@ -65,7 +65,8 @@ class Watcher(threading.Thread):
             textprep.save_last(k, text)
         if os.path.exists(config.path(".mute")):
             return
-        if self.cfg.get("focus_follows", True):
+        asked = waiting_for(s["id"])                       # you asked this session something by voice: you want to hear the answer
+        if self.cfg.get("focus_follows", True) and not asked:
             cur = sessions.current()
             if cur and cur["id"] != s["id"]:
                 print(f"  ({spoken_name(s)} finished; you are looking elsewhere, reply saved)", flush=True)
@@ -85,6 +86,27 @@ class Watcher(threading.Thread):
 
 
 # ---------- being addressed by name ----------
+ANSWER_WAIT = 600                # seconds: a reply this soon after you spoke to a session is read wherever you are looking
+
+
+def spoke_to(sid):
+    """Remember that you just spoke to this session (and that it is now the one you last used)."""
+    config.write_state("last_session", sid)
+    config.write_state("spoke_to", f"{sid} {time.time():.0f}")
+
+
+def waiting_for(sid):
+    """True once for the first reply after you spoke to this session, within ANSWER_WAIT seconds."""
+    try:
+        who, when = config.read_state("spoke_to").split()
+    except ValueError:
+        return False
+    if who != sid or time.time() - float(when) > ANSWER_WAIT:
+        return False
+    config.write_state("spoke_to", "")
+    return True
+
+
 def addressed(text, cfg):
     """'Computer, switch to X' -> 'switch to X'. None when the sentence is not addressed to the assistant."""
     name = (cfg.get("name") or "").strip().lower()
