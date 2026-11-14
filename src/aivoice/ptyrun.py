@@ -36,8 +36,8 @@ def run(cmd, speak=True, idle=1.5):
     srv.listen(4)
     srv.setblocking(False)
     term = os.environ.get("ITERM_SESSION_ID", "").split(":")[-1]
-    sessions.register({"id": sid, "sink": "pty", "target": sock_path, "app": "", "term": term,
-                       "created": time.time(), "pid": os.getpid()})
+    sessions.register({"id": sid, "sink": "pty", "target": sock_path, "app": "", "term": term, "cmd": os.path.basename(cmd[0]),
+                       "name": os.path.basename(cmd[0]), "created": time.time(), "pid": os.getpid()})
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))      # still run the cleanup below
 
     pid, fd = pty.fork()

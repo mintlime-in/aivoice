@@ -9,7 +9,7 @@ import collections, os, queue, re, threading, time
 import numpy as np
 import sounddevice as sd
 
-from . import aec, config, intent, commands, llm, platform_, sessions, sinks, stt, textprep, tts_client, vad
+from . import aec, config, intent, commands, wake, llm, platform_, sessions, sinks, stt, textprep, tts_client, vad
 
 SR = 16000
 BLOCK = vad.BLOCK               # 512 samples = 32 ms (what Silero expects)
@@ -36,9 +36,9 @@ def load_glossary():
             words = [w.strip() for w in fh if w.strip() and not w.startswith("#")]
     except OSError:
         pass
-    name = (CFG.get("name") or "").strip()
-    if name and name.lower() not in [w.lower() for w in words]:
-        words.insert(0, name.capitalize())               # so Whisper spells the assistant's name the way we match it
+    for name in [(CFG.get("name") or "").strip().capitalize()] + (list(wake.TOOLS) if CFG.get("wake") == "tool" else []):
+        if name and name.lower() not in [w.lower() for w in words]:
+            words.insert(0, name)                        # so Whisper spells the names the way we match them
     return ("Terms that may come up: " + ", ".join(words) + ".")[:600] if words else None
 
 
@@ -181,6 +181,7 @@ def main():
         wake_words = (cfg.get("wake_word") or "").lower().split()
         wake_rx = re.compile(r"^[\W_]*" + r"[\W_]+".join(map(re.escape, wake_words)) + r"[\W_]*", re.I) if wake_words else None
         wake_window, awake_until = float(cfg["wake_window"]), 0.0
+        tool_gate = wake.Gate(cfg["wake_window"]) if cfg.get("wake", "tool") == "tool" and not wake_rx else None
 
         while True:
             blk, t_cap = q.get()
@@ -290,6 +291,21 @@ def main():
                     continue
                 text = rest                                      # not one of the assistant's own commands: treat it like any sentence
             sink, key, where = route(cfg, default_sink)
+            if tool_gate and not (textprep.classify(text) or intent.loose(text)):   # voice controls never need a name
+                tool = wake.tool_for(sessions.get(key), platform_.front_app())
+                if tool:
+                    verdict, val = tool_gate.check(text, tool, key, time.time())
+                    if verdict == "ignore":
+                        print(f"{time.strftime('%H:%M:%S')}   (not sent; start with '{tool}, ...': {text})", flush=True)
+                        continue
+                    if verdict == "other":
+                        print(f"{time.strftime('%H:%M:%S')}   (you said {val}, but {where} is {tool}; not sent)", flush=True)
+                        tts_client.speak(f"That's {tool} in front, not {val}.")
+                        continue
+                    text = val
+                    if not text:
+                        print(f"{time.strftime('%H:%M:%S')}   (listening for {tool})", flush=True)
+                        continue
             print(f"{time.strftime('%H:%M:%S')} > {text}   [{len(audio)/SR:.1f}s audio, {time.time()-t0:.1f}s to transcribe] -> {where}", flush=True)
             fwd = voice_command(text, sink, key)
             if fwd is None:

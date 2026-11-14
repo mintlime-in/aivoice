@@ -36,8 +36,9 @@ DEFAULTS = {
     "aec_delay_ms": 150,              # speaker -> microphone round trip on your machine
     "barge_in": True,                 # talk over the voice to interrupt it
     "barge_ratio": 2.2,               # how much louder than the echo you must be
-    "wake_word": "",                  # e.g. "hey claude": ignore speech until you say it (then stay awake)
-    "wake_window": 30,                # seconds you can keep talking after the wake word
+    "wake": "tool",                   # tool: start with the tool's name ("Claude, ...", "Hey ChatGPT, ...") to send speech to it | off: send everything
+    "wake_word": "",                  # a fixed phrase instead, e.g. "hey computer": ignore speech until you say it (then stay awake)
+    "wake_window": 30,                # seconds you can keep talking after the name, without saying it again
     "focus_follows": True,            # speech goes to the session you are looking at; only it speaks
     "app": "",                        # sink=keystroke: app to bring to front before typing
     # --- optional local LLM (summaries, chat sink). Nothing breaks without it. ---

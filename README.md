@@ -7,7 +7,9 @@ your own machine: your audio never leaves it.
 aivoice is not an assistant. It does not chat or answer on its own: what you say goes to your AI tool, and what the tool replies is
 read back to you. The only things it handles itself are voice controls ("stop", "read it all") and moving between your sessions.
 
-- **Talk, don't type.** Your speech is typed into the session you are looking at.
+- **Talk to the tool by name.** *"Claude, run the tests"*, *"Hey ChatGPT, ..."*, *"Codex, ..."*. Only what starts with the name of
+  the tool in front is typed into it, so talking to someone in the room never reaches your AI. For 30 seconds after, follow-ups need no
+  name. "Stop", "read it all" and "Computer, ..." work without it. `wake = "off"` sends everything you say.
 - **Hear the answer your way.** Brief by default. Say *"read it all"* for the whole reply, *"summarize that"* for a summary.
 - **The tool says what to say.** `aivoice setup` offers to ask Claude Code (and Codex, Gemini CLI) to end each reply with a short
   line starting with 🔊, meant to be heard. aivoice reads that line: no summary step, no local model needed. Without it, short replies
