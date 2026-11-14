@@ -240,7 +240,7 @@ def _gen_ollama(messages, cfg, max_tokens):
 def _openai_req(cfg, path, body=None, timeout=120):
     import os
     headers = {"Content-Type": "application/json"}
-    key = os.environ.get("JARVIS_AI_LLM_KEY", "")            # from the environment only: never stored in the config file
+    key = os.environ.get("AIVOICE_LLM_KEY", "")            # from the environment only: never stored in the config file
     if key:
         headers["Authorization"] = "Bearer " + key
     req = urllib.request.Request(cfg["llm_url"].rstrip("/") + path, data=json.dumps(body).encode() if body is not None else None, headers=headers)
@@ -269,7 +269,7 @@ def _gen_openai(messages, cfg, max_tokens):
 def generate(messages, cfg, max_tokens=None):
     b = backend(cfg)
     if b is None:
-        raise RuntimeError("no local LLM available (run `jarvis-ai setup --llm`, or set llm_url to an OpenAI-compatible server)")
+        raise RuntimeError("no local LLM available (run `aivoice setup --llm`, or set llm_url to an OpenAI-compatible server)")
     n = max_tokens or int(cfg["llm_max_tokens"])
     out = {"mlx": _gen_mlx, "llamacpp": _gen_llama, "ollama": _gen_ollama, "openai": _gen_openai}[b](messages, cfg, n)
     return re.sub(r"<think>.*?</think>", "", out, flags=re.S).strip()

@@ -1,6 +1,6 @@
 import pytest
 
-from jarvis_ai import intent, llm
+from aivoice import intent, llm
 
 
 @pytest.mark.parametrize("phrase,kind", [

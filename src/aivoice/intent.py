@@ -13,7 +13,7 @@ from . import llm, textprep
 
 ACTIONS = ("forward", "full", "brief", "stop", "interrupt", "mode_full", "mode_brief", "clip_full", "clip_brief", "help")
 _STANDING = re.compile(r"from now on|always|by default|every time|going forward|each time|from here on")
-_ABOUT_ME = re.compile(r"\b(you|your|yourself|jarvis|voice|assistant)\b")
+_ABOUT_ME = re.compile(r"\b(you|your|yourself|computer|voice|assistant)\b")
 MAX_WORDS_COMMANDS = 12          # `commands` level: only short sentences are even considered
 
 _FILLER = set("it that this me the reply response answer message thing out loud aloud to of in please can you could would "
@@ -25,7 +25,7 @@ _BRIEF_W = {"summary", "summarize", "summarise", "summarized", "short", "shorter
 
 _Q = (r"(?:be quiet|quiet|silence|shut up|hush|enough|that's enough|thats enough|stop|stop it|stop talking|stop reading|hold on|wait|pause|"
       r"one second|one moment|hang on)")
-_QUIET = re.compile(rf"^(?:ok(?:ay)? |please |jarvis |hey )*{_Q}(?: {_Q})*(?: please| now| for a (?:second|moment|minute|bit)| jarvis| thanks)*$")
+_QUIET = re.compile(rf"^(?:ok(?:ay)? |please |computer |hey )*{_Q}(?: {_Q})*(?: please| now| for a (?:second|moment|minute|bit)| jarvis| thanks)*$")
 
 
 def loose(text):
@@ -93,7 +93,7 @@ def _ask(text, cfg):
 
 def interpret(text, cfg, use_model=True):
     """-> ("command", name) | ("forward", text to send on). `use_model=False`: only the fixed and loose phrases decide
-    (used when you talk to Jarvis, where the conversation step handles everything else)."""
+    (used when you talk to the assistant, where the conversation step handles everything else)."""
     c = textprep.classify(text) or loose(text)
     if c:
         return "command", c

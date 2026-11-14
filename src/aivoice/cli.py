@@ -1,4 +1,4 @@
-"""jarvis-ai command line."""
+"""aivoice command line."""
 import argparse, json, os, subprocess, sys, time, urllib.request
 
 from . import config, platform_, sessions, textprep, tts_client
@@ -26,14 +26,14 @@ def _spawn_listener():
         return False
     config.ensure()
     log = open(config.path("listener.log"), "ab")
-    p = subprocess.Popen([sys.executable, "-m", "jarvis_ai.listener"], stdout=log, stderr=log,
+    p = subprocess.Popen([sys.executable, "-m", "aivoice.listener"], stdout=log, stderr=log,
                          stdin=subprocess.DEVNULL, env=os.environ.copy(), **platform_.detach_kwargs())
     config.write_state("listener.pid", str(p.pid))
     return True
 
 
 def _off():
-    """True after `jarvis-ai off`: automatic start-up stays disabled until `jarvis-ai on`."""
+    """True after `aivoice off`: automatic start-up stays disabled until `aivoice on`."""
     return os.path.exists(config.path(".off"))
 
 
@@ -67,10 +67,10 @@ def _install_ollama(ask=input):
     elif platform_.IS_LINUX and shutil.which("curl"):
         cmd, shown = ["sh", "-c", "curl -fsSL https://ollama.com/install.sh | sh"], "curl -fsSL https://ollama.com/install.sh | sh   (asks for your password)"
     else:
-        print("  install Ollama from https://ollama.com, then run `jarvis-ai setup --llm` again")
+        print("  install Ollama from https://ollama.com, then run `aivoice setup --llm` again")
         return False
     if not sys.stdin.isatty():
-        print(f"  to install Ollama run:  {shown}\n  then `jarvis-ai setup --llm` again")
+        print(f"  to install Ollama run:  {shown}\n  then `aivoice setup --llm` again")
         return False
     if ask(f"  Install Ollama now with:  {shown}  ? [y/N] ").strip().lower() not in ("y", "yes"):
         return False
@@ -127,16 +127,16 @@ def cmd_setup(a):
             fh.write("# one term per line: names Whisper tends to mishear (project names, libraries, people)\n")
     from . import models
     print("\n".join(models.report(cfg)))
-    print("setup done. Next: `jarvis-ai on`")
+    print("setup done. Next: `aivoice on`")
 
 
 def cmd_on(a):
     if getattr(a, "login", False) and _off():
         return
     if a.model:
-        os.environ["JARVIS_AI_STT_MODEL"] = a.model
+        os.environ["AIVOICE_STT_MODEL"] = a.model
     if a.sink:
-        os.environ["JARVIS_AI_SINK"] = a.sink
+        os.environ["AIVOICE_SINK"] = a.sink
     if a.target:
         config.write_state("target", a.target)
     elif not config.read_state("target"):
@@ -159,7 +159,7 @@ def _stop_processes():
     if pid:
         platform_.kill_pid(pid)
     tts_client.stop_server()
-    for f in (_pidfile(), config.path("ui.url")):
+    for f in (_pidfile(),):
         try:
             os.unlink(f)
         except OSError:
@@ -167,38 +167,21 @@ def _stop_processes():
     config.write_state("speaking_until", "0")
 
 
-def cmd_open(a=None):
-    """What a bare `jarvis-ai` does: turn it on if needed and open the window."""
-    import webbrowser
-    if not _listener_pid():
-        _clear_off()
-        _spawn_listener()
-        print("starting Jarvis (the first start loads the models) ...")
-    for _ in range(360):
-        url = config.read_state("ui.url")
-        if url and _listener_pid():
-            webbrowser.open(url)
-            print("Jarvis is open in your browser. `jarvis-ai off` stops it.")
-            return
-        time.sleep(0.5)
-    print(f"Jarvis did not start. See {config.path('listener.log')}")
-
-
 def cmd_stop(a):
     _stop_processes()
     config.write_state(".off", "1")
-    print("stopped. It stays off (sessions will not restart it) until you run `jarvis-ai on`.")
+    print("stopped. It stays off (sessions will not restart it) until you run `aivoice on`.")
 
 
 def cmd_login(a):
-    """Start at login: a per-user entry that runs `jarvis-ai on` unless you turned it off."""
+    """Start at login: a per-user entry that runs `aivoice on` unless you turned it off."""
     p = platform_.login_file()
     if a.state == "on":
-        platform_.set_login([sys.executable, "-m", "jarvis_ai.cli", "on", "--login"])
-        print(f"Jarvis starts when you log in ({p}).\nIt stays off if you ran `jarvis-ai off`. Undo with `jarvis-ai login off`.")
+        platform_.set_login([sys.executable, "-m", "aivoice.cli", "on", "--login"])
+        print(f"aivoice starts when you log in ({p}).\nIt stays off if you ran `aivoice off`. Undo with `aivoice login off`.")
     elif a.state == "off":
         platform_.set_login(None)
-        print("Jarvis no longer starts at login.")
+        print("aivoice no longer starts at login.")
     else:
         print(f"start at login: {'on' if os.path.exists(p) else 'off'} ({p})")
 
@@ -210,12 +193,8 @@ def cmd_status(a):
     print("voice server:", "running" if tts_client.running() else "stopped")
     print(f"replies are read: {'in full' if textprep.get_mode() == 'full' else 'briefly'}")
     print("\n".join(models.report(cfg)))
-    if not cfg.get("discover", False):
-        from . import brain
-        print(f"answers come from: {brain.describe(cfg)}")
-        return
-    from . import jarvis
-    jarvis.sync()
+    from . import commands
+    commands.sync()
     ss = sessions.all()
     print(f"sessions: {len(ss)}")
     for s in ss:
@@ -246,9 +225,9 @@ def cmd_speak(a):
 def cmd_run(a):
     cmd = [c for c in a.command if c != "--"] if a.command and a.command[0] == "--" else a.command
     if not cmd:
-        sys.exit("usage: jarvis-ai run [--no-speak] -- <command> [args...]")
+        sys.exit("usage: aivoice run [--no-speak] -- <command> [args...]")
     if platform_.IS_WIN:
-        sys.exit("`jarvis-ai run` needs a Unix pseudo-terminal (macOS, Linux, or WSL on Windows).")
+        sys.exit("`aivoice run` needs a Unix pseudo-terminal (macOS, Linux, or WSL on Windows).")
     from . import ptyrun
     ptyrun.run(cmd, speak=not a.no_speak, idle=a.idle)
 
@@ -290,7 +269,7 @@ def cmd_doctor(a):
     sys.exit(0 if ok else 1)
 
 
-HELP_TOP = """Jarvis: a voice assistant on your own computer. Run `jarvis-ai` with nothing after it to open its window.
+HELP_TOP = """aivoice: talk to your AI coding agents hands-free and hear their answers. Speech recognition and the voice run on this machine.
 
 get started:
   setup       one-time download of the speech models (about 2 GB)
@@ -300,16 +279,16 @@ get started:
   login on    start by itself when you log in (login off undoes it)
 
 use with any tool:
-  run         add voice to any interactive CLI:    jarvis-ai run -- aider
-  speak       read text aloud:                     some-agent | jarvis-ai speak
+  run         add voice to any interactive CLI:    aivoice run -- aider
+  speak       read text aloud:                     some-agent | aivoice speak
               (--mode full reads everything, default is a short version)
 
 while talking, say:
   "stop" silences the voice          "interrupt" also stops the AI's turn
   "read it all"  the whole reply     "summarize that"  a short version
 """
-HELP_END = """'jarvis-ai <command> -h' shows the options of one command.
-files: ~/.jarvis-ai/config.toml, listener.log, tts.log      docs: https://github.com/keshore/jarvis-ai"""
+HELP_END = """'aivoice <command> -h' shows the options of one command.
+files: ~/.aivoice/config.toml, listener.log, tts.log      docs: https://github.com/mintlime-in/aivoice"""
 
 
 def _suggest(choices):
@@ -320,11 +299,11 @@ def _suggest(choices):
     w = sys.argv[1]
     near = [c for c in choices if c.startswith(w)] or difflib.get_close_matches(w, list(choices), n=2, cutoff=0.5)
     shown = " or ".join(f"'{c}'" for c in near[:3])
-    sys.exit(f"jarvis-ai: unknown command '{w}'" + (f" (did you mean {shown}?)" if near else "") + "\nrun 'jarvis-ai -h' for the commands")
+    sys.exit(f"aivoice: unknown command '{w}'" + (f" (did you mean {shown}?)" if near else "") + "\nrun 'aivoice -h' for the commands")
 
 
 def main():
-    ap = argparse.ArgumentParser(prog="jarvis-ai", description=HELP_TOP, epilog=HELP_END,
+    ap = argparse.ArgumentParser(prog="aivoice", description=HELP_TOP, epilog=HELP_END,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     sp = ap.add_subparsers(dest="cmd", required=True, metavar="<command>", title=argparse.SUPPRESS)
 
@@ -351,8 +330,6 @@ def main():
     s.add_argument("command", nargs=argparse.REMAINDER); s.set_defaults(f=cmd_run)
 
     ap._subparsers._group_actions.clear(); sp._choices_actions = []   # the grouped text above replaces argparse's flat list; every command stays callable
-    if len(sys.argv) == 1:
-        return cmd_open()
     _suggest(sp.choices)
     a = ap.parse_args()
     a.f(a)

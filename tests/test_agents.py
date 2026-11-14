@@ -1,6 +1,6 @@
 import json, os
 
-from jarvis_ai import agents
+from aivoice import agents
 
 
 def line(kind, text=None, stop=None, side=False, tool=False):

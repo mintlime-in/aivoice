@@ -3,7 +3,7 @@
 ```
  mic -> listener (voice detection, echo cancellation) -> Whisper
                                    |
-        "Jarvis, ..."? --yes--> jarvis: fixed patterns, else the local model fills a form that plain code checks
+        "Computer, ..."? --yes--> commands: fixed patterns, else the local model fills a form that plain code checks
               |no                  |-> list / switch / status / read: done locally
               v                    `-> ask a session / open a session: approval gate (you click) -> typed where you can see it
    spoken command? --yes--> handled locally (zero tokens)
@@ -11,7 +11,7 @@
               v
    the session in front  -> sink: iterm | tmux | keystroke | pty | exec | llm | stdout  -> your AI (the visible, real session)
 
- your AI's reply -> transcript watcher | pipe | `jarvis-ai run` | clipboard
+ your AI's reply -> transcript watcher | pipe | `aivoice run` | clipboard
                  -> brief or full -> voice daemon (Kokoro) -> speakers
 ```
 
@@ -23,11 +23,11 @@
   Everything read from an agent is data: it is spoken, never executed.
 - **Approval gate** (`gate.py`): the model proposes, you approve each action in a dialog (Cancel is the default; silence is no). What you
   dictate to the session in front is typed as said and needs no approval. Proposals and decisions go to `audit.log`.
-- **Core** (`src/jarvis_ai`): `listener` (mic, VAD, barge-in, wake word, commands), `stt` (mlx / faster-whisper), `textprep`
+- **Core** (`src/aivoice`): `listener` (mic, VAD, barge-in, wake word, commands), `stt` (mlx / faster-whisper), `textprep`
   (markdown to speakable text, brief or full, command recognition), `tts_server` / `tts_client` (warm Kokoro daemon on a
-  token-protected loopback socket, in-process playback via sounddevice), `sessions` (registry + router), `agents` (connectors), `jarvis` (commands by name, watcher), `intent`, `gate`, `sinks`, `ptyrun`
+  token-protected loopback socket, in-process playback via sounddevice), `sessions` (registry + router), `agents` (connectors), `commands` (commands by name, watcher), `intent`, `gate`, `sinks`, `ptyrun`
   (universal CLI wrapper), `llm` (optional: mlx, Ollama or an OpenAI-compatible server), `platform_` (every OS difference in one file), `config`, `cli`.
-- **State** (`~/.jarvis-ai`): `config.toml`, `glossary.txt`, `sessions/*.json`, `last/<session>.md` (last reply, for "read it all"),
+- **State** (`~/.aivoice`): `config.toml`, `glossary.txt`, `sessions/*.json`, `last/<session>.md` (last reply, for "read it all"),
   `tts.port` (0600), `audit.log` (0600), `mode`, `.off`, `.paused`, logs.
 - **Voice detection:** Silero VAD (ONNX, via `pysilero-vad`) gives a speech probability per 32 ms block; `vad.Segmenter` turns that into utterances
   with hysteresis (starts at 0.6 for three blocks, ends below 0.35 for 0.65 s, keeps a pre-roll). A volume gate is the fallback.

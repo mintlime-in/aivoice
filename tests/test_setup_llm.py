@@ -1,6 +1,6 @@
 import pytest
 
-from jarvis_ai import cli, llm, platform_
+from aivoice import cli, llm, platform_
 
 
 @pytest.fixture

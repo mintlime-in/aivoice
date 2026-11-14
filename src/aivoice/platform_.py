@@ -63,7 +63,7 @@ def activate_app(name):
 # ---------- typing into whatever has focus ----------
 def type_text(text, enter=True):
     """Type text into the focused window. macOS: AppleScript (needs Accessibility permission).
-    Elsewhere: pynput (pip install 'jarvis-ai[keys]'; on Wayland use X11 or tmux)."""
+    Elsewhere: pynput (pip install 'aivoice[keys]'; on Wayland use X11 or tmux)."""
     if IS_MAC:
         esc = text.replace("\\", "\\\\").replace('"', '\\"')
         osascript(f'tell application "System Events" to keystroke "{esc}"'
@@ -77,7 +77,7 @@ def type_text(text, enter=True):
             k.press(Key.enter); k.release(Key.enter)
         return True
     except Exception as e:
-        print(f"  (cannot type: {e}; install pynput: pip install 'jarvis-ai[keys]')", flush=True)
+        print(f"  (cannot type: {e}; install pynput: pip install 'aivoice[keys]')", flush=True)
         return False
 
 
@@ -138,16 +138,16 @@ def kill_pid(pid):
 
 
 # ---------- start at login ----------
-LOGIN_LABEL = "ai.jarvis.listener"
+LOGIN_LABEL = "in.mintlime.aivoice"
 
 
 def login_file():
-    """The per-user file that starts Jarvis at login on this system (no administrator rights needed)."""
+    """The per-user file that starts the assistant at login on this system (no administrator rights needed)."""
     if IS_MAC:
         return os.path.expanduser(f"~/Library/LaunchAgents/{LOGIN_LABEL}.plist")
     if IS_WIN:
-        return os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "Microsoft", "Windows", "Start Menu", "Programs", "Startup", "jarvis-ai.cmd")
-    return os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"), "autostart", "jarvis-ai.desktop")
+        return os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "Microsoft", "Windows", "Start Menu", "Programs", "Startup", "aivoice.cmd")
+    return os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"), "autostart", "aivoice.desktop")
 
 
 def login_entry(argv):
@@ -158,7 +158,7 @@ def login_entry(argv):
     if IS_WIN:
         return "@echo off\r\nstart \"\" /min " + subprocess.list2cmdline(argv) + "\r\n"
     import shlex
-    return ("[Desktop Entry]\nType=Application\nName=Jarvis AI\nComment=Hands-free voice for AI agents\n"
+    return ("[Desktop Entry]\nType=Application\nName=aivoice\nComment=Hands-free voice for AI coding agents\n"
             f"Exec={shlex.join(argv)}\nTerminal=false\nX-GNOME-Autostart-enabled=true\n")
 
 

@@ -42,7 +42,7 @@ def _whisper(cfg):
             size = 0
     engine = "MLX (Apple GPU)" if backend == "mlx" else "faster-whisper (CPU, or NVIDIA GPU)"
     return {"job": "speech to text", "model": name, "engine": engine, "bytes": size, "ready": size > 0,
-            "note": "" if size else "run `jarvis-ai setup`"}
+            "note": "" if size else "run `aivoice setup`"}
 
 
 def _llm(cfg):
@@ -53,12 +53,12 @@ def _llm(cfg):
         name = llm.model_name(cfg)
         size = _hf(name) if llm._mlx_cached(cfg) else 0
         return {"job": "local LLM", "model": name, "engine": "MLX (Apple GPU)", "bytes": size, "ready": size > 0,
-                "note": (picked if cfg.get("llm_model", "auto") == "auto" else "set in config") if size else "optional: run `jarvis-ai setup --llm`"}
+                "note": (picked if cfg.get("llm_model", "auto") == "auto" else "set in config") if size else "optional: run `aivoice setup --llm`"}
     if want in ("auto", "llamacpp") and llm._llama_available() and not (want == "auto" and platform_.APPLE_SILICON and llm._mlx_available()):
         path = llm.gguf_path(cfg)
         size = _size(os.path.realpath(path)) if path else 0
         return {"job": "local LLM", "model": llm.gguf_name(cfg).rsplit("/", 1)[-1], "engine": "llama.cpp (built in)", "bytes": size, "ready": size > 0,
-                "note": (picked if cfg.get("gguf_model", "auto") == "auto" else "set in config") if size else "optional: run `jarvis-ai setup --llm`"}
+                "note": (picked if cfg.get("gguf_model", "auto") == "auto" else "set in config") if size else "optional: run `aivoice setup --llm`"}
     if want in ("auto", "openai") and cfg.get("llm_url") and want != "ollama":
         up = llm.backend(cfg) == "openai"
         return {"job": "local LLM", "model": cfg.get("llm_api_model") or "(server default)", "engine": f"server at {cfg['llm_url']}",
@@ -67,10 +67,10 @@ def _llm(cfg):
     tags = llm._ollama_models(cfg)
     ready = bool(tags) and any(t == name or t.split(":")[0] == name for t in tags)
     note = (picked if cfg.get("ollama_model", "auto") == "auto" else "set in config") if ready else (
-        "optional: run `jarvis-ai setup --llm`")
+        "optional: run `aivoice setup --llm`")
     if platform_.APPLE_SILICON and not ready and want != "ollama":       # on Apple Silicon the model would run on MLX once mlx-lm is installed
         return {"job": "local LLM", "model": llm.model_name(cfg), "engine": "MLX (Apple GPU)", "bytes": 0, "ready": False,
-                "note": "optional: `pipx inject jarvis-ai mlx-lm`, then `jarvis-ai setup --llm`"}
+                "note": "optional: `pipx inject aivoice mlx-lm`, then `aivoice setup --llm`"}
     return {"job": "local LLM", "model": name, "engine": "Ollama", "bytes": 0, "ready": ready, "note": note}
 
 
@@ -78,7 +78,7 @@ def _voice(cfg):
     paths = [config.path("models", f) for f in KOKORO_FILES]
     ready = all(os.path.exists(p) for p in paths)
     return {"job": "voice", "model": f"Kokoro v1.0, voice {cfg.get('voice', '')}", "engine": "ONNX (CPU)",
-            "bytes": sum(_size(p) for p in paths if os.path.exists(p)), "ready": ready, "note": "" if ready else "run `jarvis-ai setup`"}
+            "bytes": sum(_size(p) for p in paths if os.path.exists(p)), "ready": ready, "note": "" if ready else "run `aivoice setup`"}
 
 
 def rows(cfg):

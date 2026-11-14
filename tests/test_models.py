@@ -1,4 +1,4 @@
-from jarvis_ai import config, llm, models
+from aivoice import config, llm, models
 
 
 def test_report_names_all_three_models_and_says_what_is_missing(tmp_path, monkeypatch):

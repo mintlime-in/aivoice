@@ -126,7 +126,7 @@ def main():
             gen += 1
             stop_playback()
         if text != "__STOP__":
-            m = re.match(r"__VOICE:([a-z]{2}_[a-z0-9]+)__\n?", text)      # optional per-message voice (Jarvis's own voice)
+            m = re.match(r"__VOICE:([a-z]{2}_[a-z0-9]+)__\n?", text)      # optional per-message voice (the assistant's own voice)
             voice = m.group(1) if m else ""
             latest.put((text[m.end():] if m else text, gen, voice))
 

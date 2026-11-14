@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from jarvis_ai import vad
+from aivoice import vad
 
 B = vad.BLOCK
 
@@ -101,7 +101,7 @@ def test_silero_ignores_noise():
 
 def test_a_pause_inside_a_sentence_is_allowed_but_a_short_command_ends_quickly():
     import numpy as np
-    from jarvis_ai import vad
+    from aivoice import vad
     bs = vad.BLOCK / vad.SR
     blk = np.zeros(vad.BLOCK, np.float32)
 

@@ -2,14 +2,14 @@ import json, os, subprocess
 
 import pytest
 
-from jarvis_ai import gate
+from aivoice import gate
 
 
 @pytest.fixture(autouse=True)
 def home(tmp_path, monkeypatch):
-    monkeypatch.setenv("JARVIS_AI_HOME", str(tmp_path))
+    monkeypatch.setenv("AIVOICE_HOME", str(tmp_path))
     import importlib
-    from jarvis_ai import config
+    from aivoice import config
     importlib.reload(config)
     importlib.reload(gate)
     return tmp_path
